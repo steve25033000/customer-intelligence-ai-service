@@ -26,6 +26,36 @@ class ContextType(str, Enum):
     SOCIAL_MEDIA = "social_media"
     GENERAL = "general"
 
+class InsightsResponse(BaseModel):
+    """Response model for customer insights analysis"""
+    customerId: str
+    insights: List[str]
+    keyFindings: List[str]
+    businessImpact: str
+    confidenceLevel: float = Field(..., ge=0.0, le=1.0)
+    analysisDate: datetime
+    modelVersion: str
+
+class RecommendationsResponse(BaseModel):
+    """Response model for customer recommendations"""
+    customerId: str
+    recommendations: List[str]
+    priority: str = Field(..., description="Priority level: High, Medium, Low")
+    category: str
+    expectedImpact: str
+    implementationComplexity: str
+    generatedAt: datetime
+    modelVersion: str
+
+class HealthResponse(BaseModel):
+    """Response model for service health check"""
+    status: str
+    service: str
+    version: str
+    models_loaded: bool
+    timestamp: str
+    models_status: Optional[Dict[str, bool]] = None            
+
 class CustomerData(BaseModel):
     customerId: str
     email: EmailStr
