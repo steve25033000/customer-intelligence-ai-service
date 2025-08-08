@@ -1,4 +1,4 @@
-# Optimized for Render free tier
+# Optimized for Render free tier - FIXED SYNTAX
 FROM python:3.10-slim
 
 WORKDIR /app
@@ -9,10 +9,11 @@ RUN apt-get update && apt-get install -y \
     --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
-# Environment variables for memory optimization
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PIP_NO_CACHE_DIR=1
+# Environment variables for memory optimization - FIXED SYNTAX
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
 # Copy requirements first for better caching
 COPY requirements.txt .
