@@ -12,26 +12,22 @@ requests==2.31.0
 # Caching
 redis==5.0.1
 
-# AI/ML Libraries (CPU optimized for Render)
+# AI/ML Libraries with better compatibility
 torch==2.7.0 --index-url https://download.pytorch.org/whl/cpu
 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cpu
 torchaudio==2.7.0 --index-url https://download.pytorch.org/whl/cpu
-transformers==4.36.0
+
+# Updated versions for better HuggingFace Hub compatibility
+transformers==4.35.2
 sentence-transformers==2.2.2
+huggingface_hub==0.24.6
 
-# FIX: Pin HuggingFace Hub to compatible version
-huggingface_hub==0.25.2
-
+# Other dependencies
 scikit-learn==1.3.2
 numpy==1.24.3
-
-# Data processing
 pandas==2.0.3
 python-dateutil==2.8.2
-
-# Logging and environment
 structlog==23.2.0
 python-dotenv==1.0.0
-
-# Production optimization
 gunicorn==21.2.0
+
