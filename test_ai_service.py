@@ -130,9 +130,10 @@ async def test_ai_service():
         print("⚙️  TEST 4: Model Status Check")
         print("-" * 30)
         
+        
         status = await ai_engine.get_model_status()
-        print(f"🤖 Models Initialized: {status['initialized']}")
-        print(f"✅ Ready for Requests: {status['ready']}")
+        print(f"🤖 Models Initialized: {status['ready']}")
+        print(f"⏱️  Initialization Time: {status['initialization_time']:.2f}s")
         print(f"📊 Model Status:")
         for model_name, loaded in status['models'].items():
             print(f"   • {model_name}: {'✅ Loaded' if loaded else '❌ Failed'}")
