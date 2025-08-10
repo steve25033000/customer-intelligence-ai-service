@@ -5,6 +5,8 @@ services:
     plan: free
     region: oregon
     healthCheckPath: /health
+    buildCommand: pip install -r requirements.txt  # Add this if needed
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2  # ← ADD THIS LINE
     envVars:
       - key: ENVIRONMENT
         value: production
@@ -14,3 +16,4 @@ services:
         value: "1"
       - key: MALLOC_ARENA_MAX
         value: "2"
+
