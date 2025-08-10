@@ -50,7 +50,7 @@ class AIEngine:
             'sentiment_analyzer': "distilbert-base-uncased-finetuned-sst-2-english",
             'embedding_model': "all-MiniLM-L6-v2",
             'churn_model': "custom-rf-v2.0",
-            'text_generator': "gpt2-small"
+            'text_generator': "gpt2"
         }
         
         self._initialization_time = None
