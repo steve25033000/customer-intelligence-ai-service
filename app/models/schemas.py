@@ -13,6 +13,19 @@ class RiskLevel(str, Enum):
     HIGH = "High"
     CRITICAL = "Critical"
 
+class ChurnPredictionResponse(BaseModel):
+    customerId: str
+    churnPrediction: bool                    # BOOLEAN - Will customer churn? (True/False)
+    churnProbability: float                  # FLOAT - Probability score (0.0-1.0)  
+    riskLevel: RiskLevel
+    riskColor: str                          # Color indicator (red/orange/green)
+    contributingFactors: List[str]          # List of factors causing churn risk
+    recommendations: List[str]              # List of recommended actions
+    daysUntilChurn: int                     # Estimated days until churn
+    confidenceScore: float                  # Model confidence (0.905 for 90.5%)
+    predictionDate: datetime               # When prediction was made
+    modelVersion: str          
+
 class SentimentType(str, Enum):
     POSITIVE = "positive"
     NEGATIVE = "negative"
