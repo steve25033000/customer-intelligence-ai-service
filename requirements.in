@@ -1,8 +1,0 @@
-# requirements.in - high-level dependencies only
-fastapi
-uvicorn[standard]
-torch
-transformers
-sentence-transformers
-scikit-learn
-structlog

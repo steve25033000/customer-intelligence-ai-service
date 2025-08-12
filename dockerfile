@@ -1,60 +1,56 @@
+# ==========================================
+# Customer Intelligence AI Service - Railway Optimized Dockerfile
+# Railway has 8GB memory - can use full features
+# ==========================================
+
 FROM python:3.10-slim
 
+# Environment variables optimized for Railway
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    TOKENIZERS_PARALLELISM=false \
+    OMP_NUM_THREADS=2 \
+    MKL_NUM_THREADS=2
+
+# Set working directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies (Railway can handle more)
 RUN apt-get update && apt-get install -y \
-    gcc g++ curl \
-    && rm -rf /var/lib/apt/lists/*
+    gcc \
+    g++ \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
-# Copy requirements
-COPY requirements.txt .
-
-# FIXED: Install dependencies in stages to avoid conflicts
+# Upgrade pip
 RUN pip install --no-cache-dir --upgrade pip
 
-# Stage 1: Install core packages first
-RUN pip install --no-cache-dir \
-    fastapi>=0.100.0 \
-    uvicorn[standard]>=0.20.0 \
-    pydantic>=2.0.0
+# Copy requirements and install dependencies
+COPY requirements.txt .
 
-# Stage 2: Install AI packages
-RUN pip install --no-cache-dir \
-    torch>=2.0.0 \
-    numpy>=1.21.0 \
-    scikit-learn>=1.2.0
-
-# Stage 3: Install transformers and related
-RUN pip install --no-cache-dir \
-    transformers>=4.30.0 \
-    sentence-transformers>=2.2.0 \
-    huggingface-hub>=0.15.0
-
-# Stage 4: Install remaining utilities
-RUN pip install --no-cache-dir \
-    structlog>=21.0.0 \
-    httpx>=0.24.0 \
-    python-multipart>=0.0.5 \
-    psutil>=5.9.0 \
-    python-dateutil>=2.8.0
+# Railway can handle all dependencies at once
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .
 
-# Create non-root user
+# Create non-root user for security
 RUN adduser --disabled-password --gecos '' appuser && \
     chown -R appuser:appuser /app
 USER appuser
 
-EXPOSE 10000
+# Expose port (Railway assigns dynamically)
+EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:${PORT:-10000}/health || exit 1
+# Health check optimized for Railway
+HEALTHCHECK --interval=30s --timeout=30s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
 
-# Start command
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-10000} --workers 1
+# Railway-optimized start command (2 workers since Railway has more memory)
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2 --log-level info
 
 
 
