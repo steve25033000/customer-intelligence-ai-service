@@ -1,6 +1,6 @@
 # ==========================================
 # Customer Intelligence AI Service - Production Dependencies
-# Optimized for Render Free Tier (512MB limit)
+# Fixed PyTorch CPU Installation for Docker/Render
 # ==========================================
 
 # Essential FastAPI Stack
@@ -9,9 +9,11 @@ uvicorn[standard]==0.24.0
 pydantic==2.5.0
 python-multipart==0.0.6
 
-# Core AI Libraries (Memory Optimized)
+# Core AI Libraries (Fixed PyTorch Installation)
 transformers==4.35.0
-torch==2.1.0+cpu
+torch==2.1.0
+torchvision==0.16.0
+torchaudio==2.1.0
 sentence-transformers==2.2.2
 scikit-learn==1.3.0
 numpy==1.24.3
@@ -31,34 +33,14 @@ aiofiles==23.2.0
 pandas==2.1.3
 scipy==1.11.4
 
-# Async Support
-asyncio-mqtt==0.16.1
-python-dateutil==2.8.2
-
 # Security & Validation
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
-python-multipart==0.0.6
-
-# Optional: Database (if needed later)
-# sqlalchemy==2.0.23
-# alembic==1.12.1
-
-# Development & Testing (comment out for production)
-# pytest==7.4.3
-# pytest-asyncio==0.21.1
-# black==23.11.0
-# isort==5.12.0
 
 # Memory & Performance Optimizations
-psutil==5.9.6           # Memory monitoring
-orjson==3.9.10          # Faster JSON serialization
+psutil==5.9.6
+orjson==3.9.10
 
-# ==========================================
-# Excluded Heavy Dependencies (Memory Savings)
-# ==========================================
-# redis>=4.0.0          # Use in-memory cache only (~50MB saved)
-# tensorflow>=2.0.0     # Not needed for current models (~500MB saved)
-# opencv-python>=4.0.0  # Image processing not required (~100MB saved)
-# matplotlib>=3.0.0     # Visualization not needed in API (~80MB saved)
-# plotly>=5.0.0         # Interactive plots not needed (~60MB saved)
+# Development utilities
+python-dateutil==2.8.2
+
