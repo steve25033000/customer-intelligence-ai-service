@@ -28,7 +28,7 @@ exec uvicorn app.main:app \\\n\
     --host 0.0.0.0 \\\n\
     --port $PORT \\\n\
     --workers 2 \\\n\
-    --worker-class uvicorn.workers.UvicornWorker \\\n\
+    --workers uvicorn.workers.UvicornWorker \\\n\
     --access-log \\\n\
     --log-level info' > /app/entrypoint.sh && \
     chmod +x /app/entrypoint.sh
