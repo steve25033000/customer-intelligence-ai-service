@@ -1,10 +1,12 @@
 services:
   - type: web
     name: customer-intelligence-ai-service
-    env: docker  # Keep using Docker with the fixed Dockerfile
+    env: python  # ← CHANGED from docker to python
     plan: free
     region: oregon
-    healthCheckPath: /health
+    healthCheckPath: /health  # ← Points to your health endpoint
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1  # ← Reduced to 1 worker for memory
     envVars:
       - key: ENVIRONMENT
         value: production
@@ -13,8 +15,7 @@ services:
       - key: HF_XET_HIGH_PERFORMANCE
         value: "1"
       - key: MALLOC_ARENA_MAX
-        value: "2"
-      - key: PORT
-        value: "10000"  # Optional: Render sets this automatically
+        value: "1"  # ← Reduced for memory optimization
+
 
 

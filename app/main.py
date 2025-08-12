@@ -9,6 +9,9 @@ from fastapi.responses import JSONResponse
 import structlog
 from datetime import datetime
 from contextlib import asynccontextmanager
+import torch
+torch.set_num_threads(1)
+import osos.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 # Import your AI service components
 from app.services.cache_service import CacheService
