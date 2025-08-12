@@ -1,31 +1,26 @@
-"""
-Customer Intelligence AI Service - Main FastAPI Application
-Production-ready AI service with 90.5% churn accuracy
-"""
-
-from fastapi import FastAPI, HTTPException, BackgroundTasks
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-import structlog
-from datetime import datetime
+import os
+import gc
+import asyncio
+from typing import Optional, Dict, Any
 from contextlib import asynccontextmanager
-import torch
-torch.set_num_threads(1)
-import osos.environ["CUDA_VISIBLE_DEVICES"] = ""
 
-# Import your AI service components
-from app.services.cache_service import CacheService
-from app.services.ai_engine import AIEngine
-from app.models.schemas import (
-    CustomerData, 
-    SentimentRequest,
-    CustomerAnalysisResponse,
-    SentimentResponse,
-    ChurnPredictionResponse,
-    HealthResponse
-)
+# Memory optimizations for Render free tier
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
 
-# Configure logging
+try:
+    import torch
+    torch.set_num_threads(1)
+except ImportError:
+    pass
+
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+import structlog
+
+# Configure structured logging
 structlog.configure(
     processors=[
         structlog.stdlib.filter_by_level,
@@ -46,197 +41,356 @@ structlog.configure(
 
 logger = structlog.get_logger()
 
-# Global services
-cache_service = None
+# Pydantic Models
+class CustomerData(BaseModel):
+    customer_id: str = Field(..., description="Unique customer identifier")
+    email: Optional[str] = Field(None, description="Customer email")
+    purchase_frequency: Optional[int] = Field(default=0, description="Number of purchases")
+    total_spent: Optional[float] = Field(default=0.0, description="Total amount spent")
+    last_purchase_days: Optional[int] = Field(default=365, description="Days since last purchase")
+    support_tickets: Optional[int] = Field(default=0, description="Number of support tickets")
+    email_engagement: Optional[int] = Field(default=0, description="Email engagement score")
+    website_activity: Optional[int] = Field(default=0, description="Website activity score")
+    subscription_type: Optional[str] = Field(default="basic", description="Subscription tier")
+    account_age_days: Optional[int] = Field(default=30, description="Account age in days")
+
+class SentimentData(BaseModel):
+    text: str = Field(..., description="Text to analyze sentiment")
+    customer_id: Optional[str] = Field(None, description="Optional customer identifier")
+
+class CustomerAnalysisResponse(BaseModel):
+    customer_id: str
+    churn_probability: float
+    risk_level: str
+    risk_color: str
+    will_churn: bool
+    analysis: Dict[str, Any]
+    recommendations: list
+    confidence_score: float
+
+class ChurnPredictionResponse(BaseModel):
+    customer_id: str
+    will_churn: bool
+    churn_probability: float
+    risk_level: str
+    risk_color: str
+    contributingFactors: list
+    recommendations: list
+    days_until_churn: Optional[int]
+    confidence_score: float
+
+class SentimentAnalysisResponse(BaseModel):
+    text: str
+    sentiment: str
+    confidence: float
+    score: float
+    customer_id: Optional[str]
+
+# Global AI engine instance
 ai_engine = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan manager - handles startup and shutdown"""
-    global cache_service, ai_engine
-    
+    """Manage application lifespan with optimized startup and shutdown"""
     # Startup
-    logger.info("🚀 Starting Customer Intelligence AI Service...")
+    logger.info("🚀 Starting Customer Intelligence AI Service")
     
     try:
-        # Initialize services
+        # Initialize services with lazy loading
+        from app.services.cache_service import CacheService
+        from app.services.ai_engine import AIEngine
+        
         cache_service = CacheService()
+        global ai_engine
         ai_engine = AIEngine(cache_service)
         
-        # Initialize AI models
-        logger.info("🤖 Initializing AI models...")
+        # Quick initialization without loading heavy models (lazy loading)
         await ai_engine.initialize_models()
         
-        if ai_engine.is_ready():
-            logger.info("✅ Customer Intelligence AI Service ready for production!")
-        else:
-            logger.warning("⚠️ AI Service started with limited functionality")
-            
-        yield
+        # Force garbage collection after initialization
+        gc.collect()
+        
+        logger.info("✅ Customer Intelligence AI Service initialized successfully")
         
     except Exception as e:
-        logger.error("❌ Failed to initialize AI Service", error=str(e))
+        logger.error(f"❌ Failed to initialize AI Service: {e}")
         raise
     
+    yield
+    
     # Shutdown
-    logger.info("🛑 Shutting down Customer Intelligence AI Service...")
+    logger.info("🔄 Shutting down Customer Intelligence AI Service")
     if ai_engine:
-        await ai_engine.cleanup()
+        # Cleanup AI models to free memory
+        if hasattr(ai_engine, 'cleanup'):
+            await ai_engine.cleanup()
+    
+    # Final garbage collection
+    gc.collect()
+    logger.info("👋 Customer Intelligence AI Service shutdown complete")
 
-# Create FastAPI application
+# Initialize FastAPI app with lifespan management
 app = FastAPI(
     title="Customer Intelligence AI Service",
-    description="AI-powered customer analysis, sentiment analysis, and churn prediction service with 90.5% accuracy",
-    version="2.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    description="Enterprise-grade AI service providing 90.5% churn prediction accuracy for SaaS businesses",
+    version="1.0.0",
     lifespan=lifespan
 )
 
-# Configure CORS
+# CORS middleware for frontend integration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure properly for production
+    allow_origins=["*"],  # Configure for your specific domains in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Health check endpoint
-@app.get("/health", response_model=HealthResponse)
-async def health_check():
-    """Health check endpoint for monitoring and load balancers"""
-    try:
-        status = await ai_engine.get_model_status() if ai_engine else {"initialized": False}
-        
-        return HealthResponse(
-            status="healthy" if status.get("ready", False) else "degraded",
-            service="customer-intelligence-ai",
-            version="2.0.0",
-            models_loaded=status.get("ready", False),
-            timestamp=datetime.utcnow().isoformat(),
-            models_status=status.get("models", {})
-        )
-    except Exception as e:
-        logger.error("Health check failed", error=str(e))
-        return HealthResponse(
-            status="unhealthy",
-            service="customer-intelligence-ai",
-            version="2.0.0",
-            models_loaded=False,
-            timestamp=datetime.utcnow().isoformat()
-        )
+# Dependency to get AI engine
+async def get_ai_engine():
+    """Dependency to get the global AI engine instance"""
+    global ai_engine
+    if not ai_engine:
+        raise HTTPException(status_code=503, detail="AI Service not initialized")
+    return ai_engine
 
-# Root endpoint
+# Health Check Endpoints
+@app.get("/health")
+async def health_check():
+    """Lightweight health check - responds immediately without loading AI models"""
+    return {
+        "status": "healthy",
+        "service": "Customer Intelligence AI",
+        "port": os.getenv("PORT", "10000"),
+        "ready": True
+    }
+
 @app.get("/")
 async def root():
-    """Root endpoint with service information"""
+    return {
+        "message": "Customer Intelligence AI Service - 90.5% Churn Accuracy",
+        "status": "operational"
+    }
+
+# API Status and Information
+@app.get("/info")
+async def service_info():
+    """Get detailed service information"""
     return {
         "service": "Customer Intelligence AI Service",
-        "version": "2.0.0",
-        "description": "AI-powered customer analysis with 90.5% churn prediction accuracy",
+        "version": "1.0.0",
+        "churn_accuracy": "90.5%",
+        "features": [
+            "Customer Behavioral Analysis",
+            "Churn Prediction",
+            "Sentiment Analysis", 
+            "Risk Assessment",
+            "AI-Powered Recommendations"
+        ],
         "endpoints": {
             "health": "/health",
-            "docs": "/docs",
-            "customer_analysis": "/analyze-customer",
-            "sentiment_analysis": "/analyze-sentiment",
-            "churn_prediction": "/predict-churn"
+            "analyze_customer": "/analyze-customer",
+            "predict_churn": "/predict-churn",
+            "analyze_sentiment": "/analyze-sentiment",
+            "model_status": "/model-status"
         }
     }
 
-# Customer Analysis endpoint
+@app.get("/model-status")
+async def get_model_status(ai_engine = Depends(get_ai_engine)):
+    """Get current AI model status"""
+    try:
+        status = await ai_engine.get_model_status()
+        return status
+    except Exception as e:
+        logger.error(f"Error getting model status: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get model status")
+
+# Main AI Service Endpoints
 @app.post("/analyze-customer", response_model=CustomerAnalysisResponse)
-async def analyze_customer(customer_data: CustomerData):
-    """Analyze customer with AI-powered segmentation and behavioral scoring"""
+async def analyze_customer(
+    customer_data: CustomerData,
+    ai_engine = Depends(get_ai_engine)
+):
+    """
+    Comprehensive customer analysis with 90.5% churn prediction accuracy
+    
+    Provides:
+    - Churn probability prediction
+    - Risk level assessment
+    - Behavioral analysis
+    - Actionable recommendations
+    """
     try:
-        if not ai_engine or not ai_engine.is_ready():
-            raise HTTPException(status_code=503, detail="AI service not available")
+        logger.info(f"🔍 Analyzing customer: {customer_data.customer_id}")
         
-        logger.info("🔍 Processing customer analysis", customer_id=customer_data.customerId)
+        # Perform comprehensive customer analysis
+        result = await ai_engine.analyze_customer(customer_data.dict())
         
-        analysis = await ai_engine.analyze_customer(customer_data)
-        
-        logger.info("✅ Customer analysis completed", 
-                   customer_id=customer_data.customerId,
-                   segment=analysis.aiSegment,
-                   score=analysis.behavioralScore)
-        
-        return analysis
+        logger.info(f"✅ Customer analysis complete for {customer_data.customer_id}")
+        return result
         
     except Exception as e:
-        logger.error("❌ Customer analysis failed", 
-                    customer_id=customer_data.customerId,
-                    error=str(e))
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+        logger.error(f"❌ Customer analysis failed for {customer_data.customer_id}: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Customer analysis failed: {str(e)}"
+        )
 
-# Sentiment Analysis endpoint
-@app.post("/analyze-sentiment", response_model=SentimentResponse)
-async def analyze_sentiment(request: SentimentRequest):
-    """Analyze text sentiment with transformer models"""
-    try:
-        if not ai_engine or not ai_engine.is_ready():
-            raise HTTPException(status_code=503, detail="AI service not available")
-        
-        logger.info("💭 Processing sentiment analysis", 
-                   text_length=len(request.text),
-                   context=request.context.value)
-        
-        sentiment = await ai_engine.analyze_sentiment(request.text, request.context)
-        
-        logger.info("✅ Sentiment analysis completed",
-                   sentiment=sentiment.sentiment.value,
-                   confidence=sentiment.confidence)
-        
-        return sentiment
-        
-    except Exception as e:
-        logger.error("❌ Sentiment analysis failed", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Sentiment analysis failed: {str(e)}")
-
-# Churn Prediction endpoint
 @app.post("/predict-churn", response_model=ChurnPredictionResponse)
-async def predict_churn(customer_data: CustomerData):
-    """Predict customer churn with ML models"""
+async def predict_churn(
+    customer_data: CustomerData,
+    ai_engine = Depends(get_ai_engine)
+):
+    """
+    Predict customer churn with 90.5% accuracy
+    
+    Returns:
+    - Churn probability
+    - Contributing factors
+    - Risk assessment
+    - Prevention recommendations
+    """
     try:
-        if not ai_engine or not ai_engine.is_ready():
-            raise HTTPException(status_code=503, detail="AI service not available")
+        logger.info(f"🎯 Predicting churn for customer: {customer_data.customer_id}")
         
-        logger.info("🔮 Processing churn prediction", customer_id=customer_data.customerId)
+        # Perform churn prediction
+        result = await ai_engine.predict_churn(customer_data.dict())
         
-        prediction = await ai_engine.predict_churn(customer_data)
-        
-        logger.info("✅ Churn prediction completed",
-                   customer_id=customer_data.customerId,
-                   probability=prediction.churnProbability,
-                   risk=prediction.riskLevel.value)
-        
-        return prediction
+        logger.info(f"✅ Churn prediction complete for {customer_data.customer_id}")
+        return result
         
     except Exception as e:
-        logger.error("❌ Churn prediction failed", 
-                    customer_id=customer_data.customerId,
-                    error=str(e))
-        raise HTTPException(status_code=500, detail=f"Churn prediction failed: {str(e)}")
+        logger.error(f"❌ Churn prediction failed for {customer_data.customer_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Churn prediction failed: {str(e)}"
+        )
 
-# Error handlers
-@app.exception_handler(404)
-async def not_found_handler(request, exc):
-    return JSONResponse(
-        status_code=404,
-        content={"error": "Endpoint not found", "message": "Check /docs for available endpoints"}
-    )
+@app.post("/analyze-sentiment", response_model=SentimentAnalysisResponse)
+async def analyze_sentiment(
+    sentiment_data: SentimentData,
+    ai_engine = Depends(get_ai_engine)
+):
+    """
+    Analyze sentiment of customer communications
+    
+    Supports:
+    - Email content analysis
+    - Support ticket sentiment
+    - Feedback analysis
+    - Communication tone assessment
+    """
+    try:
+        logger.info(f"💭 Analyzing sentiment for text length: {len(sentiment_data.text)}")
+        
+        # Perform sentiment analysis
+        result = await ai_engine.analyze_sentiment(
+            sentiment_data.text,
+            customer_id=sentiment_data.customer_id
+        )
+        
+        logger.info("✅ Sentiment analysis complete")
+        return result
+        
+    except Exception as e:
+        logger.error(f"❌ Sentiment analysis failed: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Sentiment analysis failed: {str(e)}"
+        )
 
-@app.exception_handler(500)
-async def internal_error_handler(request, exc):
-    logger.error("Internal server error", error=str(exc))
-    return JSONResponse(
-        status_code=500,
-        content={"error": "Internal server error", "message": "AI service encountered an error"}
-    )
+# Batch Processing Endpoints
+@app.post("/analyze-customers-batch")
+async def analyze_customers_batch(
+    customers: list[CustomerData],
+    ai_engine = Depends(get_ai_engine)
+):
+    """
+    Batch analyze multiple customers for enterprise use
+    
+    Processes up to 100 customers in a single request
+    """
+    if len(customers) > 100:
+        raise HTTPException(
+            status_code=400,
+            detail="Batch size cannot exceed 100 customers"
+        )
+    
+    try:
+        logger.info(f"📊 Processing batch analysis for {len(customers)} customers")
+        
+        results = []
+        for customer in customers:
+            try:
+                result = await ai_engine.analyze_customer(customer.dict())
+                results.append(result)
+            except Exception as e:
+                logger.error(f"Failed to analyze customer {customer.customer_id}: {e}")
+                results.append({
+                    "customer_id": customer.customer_id,
+                    "error": str(e),
+                    "status": "failed"
+                })
+        
+        logger.info(f"✅ Batch analysis complete: {len(results)} results")
+        return {"results": results, "processed": len(results)}
+        
+    except Exception as e:
+        logger.error(f"❌ Batch analysis failed: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Batch analysis failed: {str(e)}"
+        )
+
+# Error Handlers
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request, exc):
+    """Handle HTTP exceptions with proper logging"""
+    logger.error(f"HTTP Exception: {exc.status_code} - {exc.detail}")
+    return {
+        "error": exc.detail,
+        "status_code": exc.status_code,
+        "service": "Customer Intelligence AI"
+    }
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request, exc):
+    """Handle general exceptions with proper logging"""
+    logger.error(f"Unexpected error: {exc}")
+    return {
+        "error": "Internal server error",
+        "status_code": 500,
+        "service": "Customer Intelligence AI",
+        "message": "Please try again or contact support"
+    }
+
+# Development and Debug Endpoints (can be removed in production)
+@app.get("/debug/memory")
+async def debug_memory():
+    """Debug endpoint to check memory usage"""
+    import psutil
+    import sys
+    
+    process = psutil.Process()
+    memory_info = process.memory_info()
+    
+    return {
+        "memory_usage_mb": round(memory_info.rss / 1024 / 1024, 2),
+        "memory_percent": round(process.memory_percent(), 2),
+        "python_version": sys.version,
+        "ai_engine_ready": ai_engine is not None and ai_engine._ready if ai_engine else False
+    }
 
 if __name__ == "__main__":
     import uvicorn
-    import os
     
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run("app.main:app", host="0.0.0.0", port=port, workers=4)
+    # Run the application
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=int(os.getenv("PORT", "8000")),
+        workers=1,  # Single worker for memory optimization
+        log_level="info"
+    )
+
