@@ -1,46 +1,40 @@
 # ==========================================
-# Customer Intelligence AI Service - Production Dependencies
-# Fixed PyTorch CPU Installation for Docker/Render
+# Customer Intelligence AI Service - Conflict-Free Dependencies
+# Memory optimized for Render Free Tier deployment
 # ==========================================
 
-# Essential FastAPI Stack
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-pydantic==2.5.0
-python-multipart==0.0.6
+# Essential FastAPI Stack (compatible versions)
+fastapi>=0.100.0
+uvicorn[standard]>=0.20.0
+pydantic>=2.0.0
+python-multipart>=0.0.5
 
-# Core AI Libraries (Fixed PyTorch Installation)
-transformers==4.35.0
-torch==2.1.0
-torchvision==0.16.0
-torchaudio==2.1.0
-sentence-transformers==2.2.2
-scikit-learn==1.3.0
-numpy==1.24.3
+# Core AI Libraries (tested compatible versions)
+torch>=2.0.0
+transformers>=4.30.0
+sentence-transformers>=2.2.0
+scikit-learn>=1.2.0
+numpy>=1.21.0
+pandas>=1.5.0
 
 # Model Management & Utilities
-huggingface-hub==0.17.3
-tokenizers==0.15.0
+huggingface-hub>=0.15.0
+tokenizers>=0.15.0
 
 # Logging & Monitoring
-structlog==23.2.0
+structlog>=21.0.0
 
-# HTTP & Networking
-httpx==0.25.2
-aiofiles==23.2.0
+# HTTP & Async Support
+httpx>=0.24.0
+aiofiles>=0.8.0
 
-# Data Processing
-pandas==2.1.3
-scipy==1.11.4
+# Security & Performance
+psutil>=5.9.0
+python-dateutil>=2.8.0
 
-# Security & Validation
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
+# Optional: Remove comments to add these if needed
+# redis>=4.0.0           # For distributed caching
+# python-jose[cryptography]>=3.3.0  # For JWT authentication
+# passlib[bcrypt]>=1.7.4  # For password hashing
 
-# Memory & Performance Optimizations
-psutil==5.9.6
-orjson==3.9.10
-
-# Development utilities
-python-dateutil==2.8.2
 
