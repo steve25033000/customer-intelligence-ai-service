@@ -1,22 +1,18 @@
-# Optimized Dockerfile for Render free tier
 FROM python:3.10-slim
+
+# Environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
 
 WORKDIR /app
 
-# Install system dependencies
+# Install dependencies
 RUN apt-get update && apt-get install -y \
     gcc g++ curl \
-    --no-install-recommends && \
-    rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
-# Environment variables for memory optimization
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1 \
-    MALLOC_ARENA_MAX=2 \
-    PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
-
-# Copy requirements and install dependencies
+# Copy and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
@@ -24,16 +20,33 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application code
 COPY . .
 
+# Create entrypoint script
+RUN echo '#!/bin/bash\n\
+export PORT=${PORT:-10000}\n\
+echo "Starting Customer Intelligence AI Service on port $PORT"\n\
+exec uvicorn app.main:app \\\n\
+    --host 0.0.0.0 \\\n\
+    --port $PORT \\\n\
+    --workers 2 \\\n\
+    --worker-class uvicorn.workers.UvicornWorker \\\n\
+    --access-log \\\n\
+    --log-level info' > /app/entrypoint.sh && \
+    chmod +x /app/entrypoint.sh
+
 # Create non-root user
-RUN useradd --create-home --shell /bin/bash app && \
-    chown -R app:app /app
-USER app
+RUN adduser --disabled-password --gecos '' appuser && \
+    chown -R appuser:appuser /app
+USER appuser
+
+EXPOSE 10000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
-    CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:$PORT/health || exit 1
 
-# Start with memory-optimized settings
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "$PORT", "--workers", "2"]
+# Use entrypoint script
+ENTRYPOINT ["/app/entrypoint.sh"]
+
+
 
 
