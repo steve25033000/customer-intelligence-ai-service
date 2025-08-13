@@ -19,7 +19,9 @@
         "OMP_NUM_THREADS": "2",
         "MKL_NUM_THREADS": "2",
         "TOKENIZERS_PARALLELISM": "false",
-        "PYTORCH_ENABLE_MPS_FALLBACK": "1"
+        "PYTORCH_ENABLE_MPS_FALLBACK": "1",
+        "ENABLE_FAST_STARTUP": "true",
+        "LAZY_LOADING": "true"
       }
     }
   }

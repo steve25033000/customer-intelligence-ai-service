@@ -1,6 +1,6 @@
 # ==========================================
-# Customer Intelligence AI Service - CPU-Optimized Railway Dependencies
-# Optimized for Railway CPU deployment (no GPU dependencies)
+# Customer Intelligence AI Service - CPU-Optimized for Fast Deployment
+# Ultra-fast startup with lazy loading optimization
 # Maintains 90.5% churn prediction accuracy
 # ==========================================
 
@@ -70,6 +70,7 @@ gunicorn>=21.2.0
 certifi>=2023.7.22
 urllib3>=2.0.0
 requests>=2.31.0
+
 
 
 
